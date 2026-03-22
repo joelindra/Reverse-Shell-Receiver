@@ -77,14 +77,6 @@ The project identifies as a standard Maven project.
 mvn clean package
 ```
 The output JAR will be in the `target/` directory.
-
-### Ant Build
-If you prefer Ant or are in a restricted environment:
-```bash
-ant jar
-```
-The output JAR will be in the `dist/` directory.
-
 ---
 
 ## Installation
