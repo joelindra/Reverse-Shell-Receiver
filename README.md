@@ -1,109 +1,85 @@
-# Reverse Shell Receiver for Burp Suite
+# Reverse Shell Receiver v1.0.0
 
-A powerful Burp Suite extension that combines a versatile network listener with a comprehensive payload generator, designed to streamline out-of-band testing and interactive reverse shell operations.
+**Reverse Shell Receiver** is a multi-functional Burp Suite extension designed for modern security testing. It combines an **Adaptive HTTP Webhook (OAST)** listener for out-of-band data exfiltration with a high-performance **Interactive Reverse Shell Terminal**.
 
-Reverse Shell Receiver integrates two essential pentesting tools directly into your Burp Suite workflow: a multi-mode listener that can catch both HTTP webhooks and interactive shells, and a payload generator with a rich library of templates for various platforms.
-
-## Table of Contents
-
-- [Core Features](#core-features)
-  - [Modern Listener Tab](#modern-listener-tab)
-  - [Payload Generator](#payload-generator)
-- [New Features & Improvements](#new-features--improvements)
-- [Dependencies](#dependencies)
-- [Building from Source](#building-from-source)
-  - [Maven (Recommended)](#maven-recommended)
-  - [Ant Build](#ant-build)
-- [Installation](#installation)
-- [Usage](#usage)
-  - [Example 1: HTTP Webhook (OAST)](#example-1-http-webhook-oast)
-  - [Example 2: Interactive Reverse Shell](#example-2-interactive-reverse-shell)
-- [Author](#author)
+Built for stability, speed, and a premium "hacker-style" aesthetic, this tool is an essential addition to any penetration tester's toolkit.
 
 ---
 
-## Core Features
+## 🎯 Key Features
 
-### Modern Listener Tab
+### 1. Adaptive HTTP Webhook (OAST)
+*   **Reliable Data Capture**: Rebuilt to parse `Content-Length` headers, ensuring complete request body capture even on slow or unstable network connections.
+*   **Syntax Highlighting**: Built-in native Burp message editor for viewing intercepted webhooks with full syntax highlighting.
+*   **Resizable History**: Easily manage and sort thousands of intercepted requests in a high-performance interactive table.
 
-The listener is the core of the tool and operates in two distinct, professionally styled modes:
+### 2. Interactive Reverse Shell Terminal
+*   **Modern Hacker Esthetics**: A dedicated shell terminal with a **Deep Dark Background** (`#0C0C0C`) and high-contrast **Vibrant Red** output.
+*   **Dynamic Remote Path Tracker**: Automatically tracks and displays your current working directory on the target server in real-time (e.g., `[Remote] [/etc/passwd]`).
+*   **Kali Linux Style Prompt**: Professional neon-cyan prompt headers (`┌──└─`) for an authentic terminal experience.
+*   **Persistent Sessions**: Handles multiple command executions within the same shell session seamlessly.
 
-- **HTTP Webhook Mode**: 
-  - Acts as a local web server to log incoming HTTP requests.
-  - Ideal for Out-of-Band Application Security Testing (OAST) like Blind SSRF or Blind SQLi.
-  - **Native Burp Integration**: Uses the professional `IMessageEditor` for request details, providing syntax highlighting and search.
-  - **Resizable Layout**: Uses a `JSplitPane` to allow flexible resizing between the history table and request details.
+### 3. Smart Payload Generator
+*   **Multi-Platform Templates**: Instant access to shell payloads for Bash, Python, Perl, PHP, PowerShell, and more.
+*   **One-Click Encoding**: Built-in support for Base64 and URL encoding to bypass WAFs and simple input filters.
+*   **Auto-IP Detection**: Detects all active local network interfaces (including VPNs) for quick listener configuration.
 
-- **Reverse Shell Mode**: 
-  - Turns the listener into an interactive handler for reverse shells.
-  - **Terminal-Like UI**: Features a clean, dark-themed terminal interface for command execution directly within Burp.
-  - **Command History**: Supports local commands like `clear` to manage the terminal output.
-
-- **Port Utility**: Includes a "Kill Used Ports" utility to identify and terminate processes blocking your desired listener ports.
-
-### Payload Generator
-
-A comprehensive generator to create one-liners and scripts tailored for your listener.
-
-- **Rich Template Library**: Includes templates for Bash, PowerShell, Python, Netcat, Perl, PHP, Ruby, and more.
-- **Categorized Payloads**: Organized into Reverse/Bind Shell, Web Shell, and Data Exfiltration.
-- **Auto-Fill**: One-click "Auto-fill from Listener" to sync your active listener's IP and port with the generator.
+### 4. System Optimizations
+*   **Instant Port Management**: A "Kill Used Ports" feature optimized with **Batch Process Mapping**, allowing you to clear blocked ports on Windows and Linux instantly.
+*   **Windows Shell Stability**: Fully compatible with Windows shell environments by correctly handling pipes (`|`) via `ProcessBuilder`.
 
 ---
 
-## New Features & Improvements
+## 🛠️ Build & Installation
 
-- **Resource Cleanup**: Intelligent memory and socket management to prevent resource leaks when the extension is unloaded.
-- **Non-Blocking UI**: All network operations and port scanning now run in background threads, ensuring the Burp Suite UI remains responsive.
-- **Context Menu Integration**: Right-click any request in Burp (Proxy, Repeater, etc.) and select **"Send to Reverse Shell Receiver"** to log it immediately.
-- **Settings Persistence**: Your port and mode preferences are automatically saved and restored between Burp sessions.
+### Prerequisites
+*   **Java Development Kit (JDK)** 11 or higher
+*   **Apache Maven** installed and configured in your environment
 
----
+### Building the Extension
+1.  **Clone the Repository**:
+    ```bash
+    git clone https://github.com/your-repo/reverse-shell-receiver.git
+    cd reverse-shell-receiver
+    ```
+2.  **Compile & Package**:
+    Run the following command to download dependencies and build the `.jar` file:
+    ```bash
+    mvn clean package
+    ```
+3.  **Locate Artifact**:
+    The compiled extension will be located in the `target/` directory:
+    `target/ReverseShellReceiver-1.0.0.jar`
 
-## Dependencies
-
-- **Java JDK 8 or higher**
-- **Burp Extender API** (Version 2.3 or later)
-
-*Note: This extension has been refactored to remove unnecessary third-party dependencies (Jackson, JJWT, etc.), resulting in a lightweight and secure JAR.*
-
----
-
-## Building from Source
-
-### Maven (Recommended)
-The project identifies as a standard Maven project.
-```bash
-mvn clean package
-```
-The output JAR will be in the `target/` directory.
----
-
-## Installation
-
-1. In Burp Suite, go to the **Extensions** tab.
-2. Click **Add**.
-3. Select **Java** as the extension type.
-4. Select the `Reverse_Shell_Receiver.jar` file.
-5. Click **Next** and wait for the "Reverse Shell Receiver" tab to appear.
+### Loading into Burp Suite
+1. Opening Burp Suite, go to the **Extensions** (formerly Extender) tab.
+2. Click **Add** -> Select **Java** as the extension type.
+3. Browse and select the `.jar` file from your `target/` folder.
+4. The **Reverse Shell Receiver** tab will appear in your top navigation menu.
 
 ---
 
-## Usage
+## 🚀 Usage Guide
 
-### Example 1: HTTP Webhook (OAST)
-1. In the **Listener** tab, select **HTTP Webhook** mode and click **Start Listener**.
-2. Right-click any request in your Burp Proxy and select **"Send to Reverse Shell Receiver"**.
-3. View the request immediately in the resizable history table with full syntax highlighting.
+### Mode: HTTP Webhook
+1.  Select **HTTP Webhook** from the mode menu.
+2.  Check your local IP from the generator dropdown and set your desired **Port**.
+3.  Click **Start Listener**.
+4.  Send any HTTP request to `http://YOUR_IP:PORT/` to see it appear in the history table.
 
-### Example 2: Interactive Reverse Shell
-1. In the **Listener** tab, select **Reverse Shell** mode and click **Start Listener**.
-2. Use the **Payload Generator** to create a payload (e.g., Python Reverse Shell).
-3. Execute the payload on the target machine.
-4. Return to the Listener tab and interact with the shell through the dedicated terminal interface.
+### Mode: Reverse Shell
+1.  Select **Reverse Shell** mode and click **Start Listener**.
+2.  Use the **Payload Generator** to create a payload matching your target's OS.
+3.  Execute the payload on the target.
+4.  The terminal will automatically clear and greet you with a session banner. You are now interactive!
 
 ---
 
-## Author
+## 🛡️ Requirements
+*   **Burp Suite Professional or Community** (Latest version recommended)
+*   Network access to the specified listening ports.
 
-- **Joel Indra**
+---
+
+## 👨‍💻 Author
+**Joel Indra**
