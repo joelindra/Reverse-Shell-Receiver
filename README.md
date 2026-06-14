@@ -1,85 +1,132 @@
-# Reverse Shell Receiver v1.0.0
+# Reverse Shell Receiver
 
-**Reverse Shell Receiver** is a multi-functional Burp Suite extension designed for modern security testing. It combines an **Adaptive HTTP Webhook (OAST)** listener for out-of-band data exfiltration with a high-performance **Interactive Reverse Shell Terminal**.
-
-Built for stability, speed, and a premium "hacker-style" aesthetic, this tool is an essential addition to any penetration tester's toolkit.
+A Burp Suite extension for penetration testers that combines an **HTTP webhook listener (OAST)**, an **interactive reverse shell terminal**, and a **multi-platform payload generator** — all within a single integrated tab.
 
 ---
 
-## 🎯 Key Features
+## Features
 
-### 1. Adaptive HTTP Webhook (OAST)
-*   **Reliable Data Capture**: Rebuilt to parse `Content-Length` headers, ensuring complete request body capture even on slow or unstable network connections.
-*   **Syntax Highlighting**: Built-in native Burp message editor for viewing intercepted webhooks with full syntax highlighting.
-*   **Resizable History**: Easily manage and sort thousands of intercepted requests in a high-performance interactive table.
+### HTTP Webhook Listener (OAST)
+- Starts a TCP socket server on any specified port to capture raw inbound HTTP requests
+- Records each request with index, HTTP method, full URL, and timestamp in a sortable, filterable history table
+- Clicking any row opens the **full request and response** side-by-side in native Burp `IMessageEditor` panels — complete with syntax highlighting, search, and automatic light/dark theme support
+- **"Send to Reverse Shell Receiver"** context menu item available in Proxy History, Message Editor (request/response), and Message Viewer — filtered to valid HTTP contexts only
 
-### 2. Interactive Reverse Shell Terminal
-*   **Modern Hacker Esthetics**: A dedicated shell terminal with a **Deep Dark Background** (`#0C0C0C`) and high-contrast **Vibrant Red** output.
-*   **Dynamic Remote Path Tracker**: Automatically tracks and displays your current working directory on the target server in real-time (e.g., `[Remote] [/etc/passwd]`).
-*   **Kali Linux Style Prompt**: Professional neon-cyan prompt headers (`┌──└─`) for an authentic terminal experience.
-*   **Persistent Sessions**: Handles multiple command executions within the same shell session seamlessly.
+### Interactive Reverse Shell Terminal
+- Receives an incoming reverse shell connection and presents a styled terminal inside Burp
+- **Dynamic path tracker**: automatically detects and displays the current working directory on the remote host in real time (e.g., `[Remote] [/var/www/html]`)
+- Kali-style prompt (`┌──(Reverse Shell Session)-[Remote][path]` / `└─#`) in a dark-background `JTextPane`
+- Separate styled text classes for output, command input, status messages, and path display
+- Input field with Enter-to-send; graceful `exit` / `quit` command handling closes the connection cleanly
 
-### 3. Smart Payload Generator
-*   **Multi-Platform Templates**: Instant access to shell payloads for Bash, Python, Perl, PHP, PowerShell, and more.
-*   **One-Click Encoding**: Built-in support for Base64 and URL encoding to bypass WAFs and simple input filters.
-*   **Auto-IP Detection**: Detects all active local network interfaces (including VPNs) for quick listener configuration.
+### Payload Generator
+Three payload categories, each with platform and template selection:
 
-### 4. System Optimizations
-*   **Instant Port Management**: A "Kill Used Ports" feature optimized with **Batch Process Mapping**, allowing you to clear blocked ports on Windows and Linux instantly.
-*   **Windows Shell Stability**: Fully compatible with Windows shell environments by correctly handling pipes (`|`) via `ProcessBuilder`.
+| Category | OS | Templates |
+|---|---|---|
+| Reverse/Bind Shell | Linux/macOS | Bash TCP, Bash UDP, Python3, Perl, PHP, Ruby, Netcat (with -e), Netcat (mkfifo) |
+| Reverse/Bind Shell | Windows | PowerShell #1, PowerShell #2 (TLS), Netcat |
+| Web Shell | — | PHP Simple Command Shell, PHP Full-featured Shell |
+| Data Exfiltration | Linux/macOS + Windows | curl / Invoke-WebRequest one-liners |
 
----
+- **IP auto-detection**: dropdown populated with all active non-loopback network interfaces (including VPNs)
+- **Encoding**: None, Base64 (wraps shell payloads in `echo <b64> | base64 -d | bash`), URL
+- Payload output rendered in a native Burp `ITextEditor` (search bar, theme-aware)
+- One-click copy to clipboard
 
-## 🛠️ Build & Installation
+### Listener Status Card
+- **ONLINE / OFFLINE** badge (colored pill) with "Listener Status" label
+- **Listening Addresses** panel: shows each detected IP:port as a clickable chip — click copies to clipboard with a brief toast notification (`Copied: ip:port`)
+- VPN hint label shown when non-loopback interfaces are detected
 
-### Prerequisites
-*   **Java Development Kit (JDK)** 11 or higher
-*   **Apache Maven** installed and configured in your environment
+### Port Management
+- **Kill Used Ports** button scans for processes occupying the configured port using `netstat` + batch process mapping
+- Displays results in a dialog with per-process kill controls
+- Works on both Windows (`netstat -ano`, `taskkill`) and Linux (`netstat -tlnp`, `kill`)
 
-### Building the Extension
-1.  **Clone the Repository**:
-    ```bash
-    git clone https://github.com/your-repo/reverse-shell-receiver.git
-    cd reverse-shell-receiver
-    ```
-2.  **Compile & Package**:
-    Run the following command to download dependencies and build the `.jar` file:
-    ```bash
-    mvn clean package
-    ```
-3.  **Locate Artifact**:
-    The compiled extension will be located in the `target/` directory:
-    `target/ReverseShellReceiver-1.0.0.jar`
+### Context Menu Integration
+Registered as `IContextMenuFactory`; the "Send to Reverse Shell Receiver" item appears only in:
+- Proxy History
+- Message Editor (request and response)
+- Message Viewer (request and response)
+- Target Site Map table
 
-### Loading into Burp Suite
-1. Opening Burp Suite, go to the **Extensions** (formerly Extender) tab.
-2. Click **Add** -> Select **Java** as the extension type.
-3. Browse and select the `.jar` file from your `target/` folder.
-4. The **Reverse Shell Receiver** tab will appear in your top navigation menu.
+Filtered from all other contexts (scanner, intruder, etc.) to prevent null-reference errors.
 
----
-
-## 🚀 Usage Guide
-
-### Mode: HTTP Webhook
-1.  Select **HTTP Webhook** from the mode menu.
-2.  Check your local IP from the generator dropdown and set your desired **Port**.
-3.  Click **Start Listener**.
-4.  Send any HTTP request to `http://YOUR_IP:PORT/` to see it appear in the history table.
-
-### Mode: Reverse Shell
-1.  Select **Reverse Shell** mode and click **Start Listener**.
-2.  Use the **Payload Generator** to create a payload matching your target's OS.
-3.  Execute the payload on the target.
-4.  The terminal will automatically clear and greet you with a session banner. You are now interactive!
+### Settings Persistence
+Port, mode selection, and other preferences are saved and restored via Burp's built-in preference store across sessions.
 
 ---
 
-## 🛡️ Requirements
-*   **Burp Suite Professional or Community** (Latest version recommended)
-*   Network access to the specified listening ports.
+## Technical Notes
+
+- All socket I/O runs on a managed `ExecutorService` — never on the Swing EDT — so Burp's UI remains responsive during listener start/stop and command dispatch
+- Cross-thread fields (`serverSocket`, `clientSocket`, `shellOut`, `currentRemotePath`, etc.) are declared `volatile` for correct visibility between the I/O threads and the EDT
+- Extension unload calls `ioExecutor.shutdownNow()` before closing sockets to ensure no orphaned threads remain
+- Uses native Burp APIs: `IMessageEditor` (request/response viewer), `ITextEditor` (payload display), `IExtensionHelpers`, `IContextMenuFactory`, `IExtensionStateListener`
 
 ---
 
-## 👨‍💻 Author
+## Build
+
+**Requirements**
+- Java 8 or higher (compiled with `source/target 1.8`)
+- Apache Maven 3.x
+
+**Steps**
+```bash
+git clone https://github.com/your-repo/reverse-shell-receiver.git
+cd reverse-shell-receiver/dev
+mvn clean package
+```
+
+Output artifact:
+```
+target/reverse-shell-receiver-1.0.0-jar-with-dependencies.jar
+```
+
+> On Windows without Maven in PATH, build via WSL:
+> ```bash
+> wsl -d kali-linux -- bash -c "cd '/mnt/e/path/to/dev' && mvn clean package"
+> ```
+
+---
+
+## Installation
+
+1. Open Burp Suite and go to **Extensions** tab (formerly Extender)
+2. Click **Add** and set extension type to **Java**
+3. Browse to `target/reverse-shell-receiver-1.0.0-jar-with-dependencies.jar`
+4. Click **Next** — the **Reverse Shell Receiver** tab will appear in the top navigation
+
+---
+
+## Usage
+
+### HTTP Webhook
+1. Select **HTTP Webhook** from the mode dropdown
+2. Enter a port number and click **Start Listener**
+3. Trigger an out-of-band HTTP request from your target (e.g., via SSRF or injected `fetch()`)
+4. The request appears in the history table — click the row to inspect full request and response
+
+### Reverse Shell
+1. Select **Reverse Shell** mode and click **Start Listener**
+2. Open the **Payload Generator** tab, select the target OS and shell type, copy the generated payload
+3. Execute the payload on the target machine
+4. The terminal session opens automatically; type commands and press Enter to execute
+
+### Send from Burp Context Menu
+Right-click any request in Proxy History or Message Editor and select **Send to Reverse Shell Receiver** to add it directly to the webhook history table.
+
+---
+
+## Requirements
+
+- Burp Suite Professional or Community Edition (latest version recommended)
+- Network access to the port configured for listening
+
+---
+
+## Author
+
 **Joel Indra**
