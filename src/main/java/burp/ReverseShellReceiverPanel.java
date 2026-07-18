@@ -40,6 +40,16 @@ import java.util.regex.Pattern;
  */
 public class ReverseShellReceiverPanel extends JPanel {
 
+    private enum ShellType {
+        UNKNOWN,
+        UNIX,
+        WINDOWS_CMD,
+        WINDOWS_PS
+    }
+
+    private volatile ShellType shellType = ShellType.UNKNOWN;
+    private volatile String lastCommand = "";
+
     private final IBurpExtenderCallbacks callbacks;
     private final IExtensionHelpers helpers;
     private JTextPane shellDisplayPane; // Renamed for clarity and upgraded from JTextArea
@@ -940,23 +950,56 @@ public class ReverseShellReceiverPanel extends JPanel {
     }
 
     private JPanel makeIpChip(String text) {
-        final Color normalBg = new Color(235, 243, 255);
-        final Color hoverBg  = new Color(210, 228, 255);
-        final Color copiedBg = new Color(214, 248, 228);
-        final Color normalFg = new Color(26, 76, 160);
-        final Color copiedFg = new Color(30, 115, 65);
+        final Color normalBg = new Color(240, 244, 252);
+        final Color hoverBg  = new Color(224, 233, 248);
+        final Color copiedBg = new Color(228, 248, 236);
 
-        JPanel chip = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
+        final Color normalBorder = new Color(212, 224, 244);
+        final Color hoverBorder  = new Color(180, 204, 240);
+        final Color copiedBorder = new Color(168, 224, 188);
+
+        final Color normalFg = new Color(44, 88, 160);
+        final Color copiedFg = new Color(36, 124, 72);
+
+        class ChipPanel extends JPanel {
+            private Color borderColor = normalBorder;
+
+            public ChipPanel() {
+                super(new FlowLayout(FlowLayout.LEFT, 10, 5));
+                setOpaque(false);
+            }
+
+            public void setBorderColor(Color color) {
+                this.borderColor = color;
+                repaint();
+            }
+
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+                // Fill background
+                g2.setColor(getBackground());
+                g2.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 14, 14);
+
+                // Draw border
+                g2.setColor(borderColor);
+                g2.setStroke(new BasicStroke(1.2f));
+                g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 14, 14);
+
+                g2.dispose();
+            }
+        }
+
+        ChipPanel chip = new ChipPanel();
         chip.setBackground(normalBg);
-        chip.setOpaque(true);
-        chip.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(180, 215, 255), 1, true),
-                new EmptyBorder(4, 10, 4, 10)));
         chip.setCursor(new Cursor(Cursor.HAND_CURSOR));
         chip.setToolTipText("Click to copy");
+        chip.setBorder(new EmptyBorder(1, 0, 1, 0));
 
         JLabel ipText = new JLabel(text);
-        ipText.setFont(new Font("Consolas", Font.BOLD, 12));
+        ipText.setFont(new Font("Consolas", Font.PLAIN, 12));
         ipText.setForeground(normalFg);
         ipText.setCursor(new Cursor(Cursor.HAND_CURSOR));
         chip.add(ipText);
@@ -967,9 +1010,7 @@ public class ReverseShellReceiverPanel extends JPanel {
                 StringSelection sel = new StringSelection(text);
                 Toolkit.getDefaultToolkit().getSystemClipboard().setContents(sel, null);
                 chip.setBackground(copiedBg);
-                chip.setBorder(BorderFactory.createCompoundBorder(
-                        BorderFactory.createLineBorder(new Color(130, 210, 160), 1, true),
-                        new EmptyBorder(4, 10, 4, 10)));
+                chip.setBorderColor(copiedBorder);
                 ipText.setForeground(copiedFg);
 
                 JWindow toast = new JWindow(SwingUtilities.getWindowAncestor(chip));
@@ -988,19 +1029,23 @@ public class ReverseShellReceiverPanel extends JPanel {
                 Timer t = new Timer(1500, evt -> {
                     toast.dispose();
                     chip.setBackground(normalBg);
-                    chip.setBorder(BorderFactory.createCompoundBorder(
-                            BorderFactory.createLineBorder(new Color(180, 215, 255), 1, true),
-                            new EmptyBorder(4, 10, 4, 10)));
+                    chip.setBorderColor(normalBorder);
                     ipText.setForeground(normalFg);
                 });
                 t.setRepeats(false);
                 t.start();
             }
             @Override public void mouseEntered(java.awt.event.MouseEvent e) {
-                if (!chip.getBackground().equals(copiedBg)) chip.setBackground(hoverBg);
+                if (!chip.getBackground().equals(copiedBg)) {
+                    chip.setBackground(hoverBg);
+                    chip.setBorderColor(hoverBorder);
+                }
             }
             @Override public void mouseExited(java.awt.event.MouseEvent e) {
-                if (!chip.getBackground().equals(copiedBg)) chip.setBackground(normalBg);
+                if (!chip.getBackground().equals(copiedBg)) {
+                    chip.setBackground(normalBg);
+                    chip.setBorderColor(normalBorder);
+                }
             }
         };
 
@@ -1350,11 +1395,15 @@ public class ReverseShellReceiverPanel extends JPanel {
                 if ("Reverse Shell".equals(mode)) {
                     try {
                         Socket client = serverSocket.accept();
+                        if (clientSocket != null && !clientSocket.isClosed()) {
+                            try {
+                                clientSocket.close();
+                            } catch (IOException e) {
+                                // ignore
+                            }
+                        }
                         clientSocket = client; // Assign to class field for management
                         handleReverseShell(client);
-                        // In this simple design, we handle one shell and then the listener stops for
-                        // that mode
-                        break;
                     } catch (IOException e) {
                         if (isListening)
                             callbacks.printError("Error accepting reverse shell: " + e.getMessage());
@@ -1367,6 +1416,7 @@ public class ReverseShellReceiverPanel extends JPanel {
                         String line;
                         String method = "";
                         String url = "";
+                        String hostHeader = "";
                         int contentLength = 0;
                         while ((line = reader.readLine()) != null && !line.isEmpty()) {
                             requestBuilder.append(line).append("\n");
@@ -1380,9 +1430,15 @@ public class ReverseShellReceiverPanel extends JPanel {
                             if (line.toLowerCase().startsWith("content-length:")) {
                                 try {
                                     contentLength = Integer.parseInt(line.substring(line.indexOf(":") + 1).trim());
+                                    if (contentLength > 10 * 1024 * 1024) {
+                                        contentLength = 10 * 1024 * 1024;
+                                    }
                                 } catch (NumberFormatException e) {
                                     contentLength = 0;
                                 }
+                            }
+                            if (line.toLowerCase().startsWith("host:")) {
+                                hostHeader = line.substring(5).trim();
                             }
                         }
 
@@ -1418,7 +1474,26 @@ public class ReverseShellReceiverPanel extends JPanel {
                         if (!url.equals("/favicon.ico")) {
                             byte[] requestBytesForHistory = requestBuilder.toString().getBytes(StandardCharsets.UTF_8);
                             byte[] responseBytesForHistory = responseString.getBytes(StandardCharsets.UTF_8);
-                            addRequestToHistory(method, url, requestBytesForHistory, responseBytesForHistory);
+
+                            String host = "localhost";
+                            int requestPort = port;
+                            String protocol = "http";
+                            if (!hostHeader.isEmpty()) {
+                                if (hostHeader.contains(":")) {
+                                    String[] hostParts = hostHeader.split(":");
+                                    host = hostParts[0];
+                                    try {
+                                        requestPort = Integer.parseInt(hostParts[1]);
+                                    } catch (NumberFormatException e) {
+                                        requestPort = 80;
+                                    }
+                                } else {
+                                    host = hostHeader;
+                                    requestPort = 80;
+                                }
+                            }
+                            IHttpService httpService = new HttpServiceImpl(host, requestPort, protocol);
+                            addRequestToHistory(method, url, requestBytesForHistory, responseBytesForHistory, httpService);
                         }
 
                         // The client socket is automatically closed by the try-with-resources block.
@@ -1508,8 +1583,22 @@ public class ReverseShellReceiverPanel extends JPanel {
             BufferedReader in = new BufferedReader(new InputStreamReader(client.getInputStream()));
             shellOut = new PrintWriter(client.getOutputStream(), true);
 
-            // Store the last sent command to filter echoes
-            final String[] lastCommand = { "" };
+            // Reset shell status
+            shellType = ShellType.UNKNOWN;
+            lastCommand = "";
+
+            // Send OS Probe command after a small delay
+            ioExecutor.submit(() -> {
+                try {
+                    Thread.sleep(300);
+                } catch (InterruptedException e) {
+                    // Ignore
+                }
+                if (shellOut != null) {
+                    shellOut.println("echo ___OS_PROBE___ $env:OS %OS%");
+                    shellOut.flush();
+                }
+            });
 
             // Reader thread for incoming data
             shellReaderThread = new Thread(() -> {
@@ -1523,6 +1612,39 @@ public class ReverseShellReceiverPanel extends JPanel {
                                 .replaceAll("\u001B\\[\\?[0-9]+[hl]", "")
                                 .replaceAll("\r", "")
                                 .trim();
+
+                        // OS Probe detection
+                        if (cleanLine.contains("___OS_PROBE___")) {
+                            if (cleanLine.startsWith("echo ") || cleanLine.contains("echo ___OS_PROBE___")) {
+                                continue;
+                            }
+                            if (cleanLine.contains("Windows_NT")) {
+                                if (cleanLine.contains("%OS%")) {
+                                    shellType = ShellType.WINDOWS_PS;
+                                } else {
+                                    shellType = ShellType.WINDOWS_CMD;
+                                }
+                            } else {
+                                shellType = ShellType.UNIX;
+                            }
+
+                            // Trigger immediate CWD update as soon as OS is resolved
+                            final String cwdCmd;
+                            if (shellType == ShellType.WINDOWS_CMD) {
+                                cwdCmd = "echo " + PWD_MARKER_START + " & cd & echo " + PWD_MARKER_END;
+                            } else if (shellType == ShellType.WINDOWS_PS) {
+                                cwdCmd = "echo " + PWD_MARKER_START + "; (pwd).Path; echo " + PWD_MARKER_END;
+                            } else {
+                                cwdCmd = "echo " + PWD_MARKER_START + "; pwd; echo " + PWD_MARKER_END;
+                            }
+                            ioExecutor.submit(() -> {
+                                if (shellOut != null) {
+                                    shellOut.println(cwdCmd);
+                                    shellOut.flush();
+                                }
+                            });
+                            continue;
+                        }
 
                         // Path tracking logic (hidden from UI)
                         if (cleanLine.equals(PWD_MARKER_START)) {
@@ -1551,13 +1673,18 @@ public class ReverseShellReceiverPanel extends JPanel {
                             continue;
                         }
 
-                        // CRITICAL: Skip any line that contains the last command we sent
-                        if (!lastCommand[0].isEmpty() && cleanLine.contains(lastCommand[0])) {
-                            continue;
+                        // CRITICAL: Skip any line that contains the last command we sent or is an echoed command
+                        if (!lastCommand.isEmpty()) {
+                            if (cleanLine.equals(lastCommand)) {
+                                continue;
+                            }
+                            if (cleanLine.endsWith(lastCommand) && (cleanLine.contains(">") || cleanLine.contains("$") || cleanLine.contains("#"))) {
+                                continue;
+                            }
                         }
 
                         // Skip lines that are just prompts with commands (# somecommand)
-                        if (cleanLine.matches("^[#$]+\\s+.*")) {
+                        if (cleanLine.matches("^[#$>\\s]+\\s+.*")) {
                             continue;
                         }
 
@@ -1663,8 +1790,17 @@ public class ReverseShellReceiverPanel extends JPanel {
 
             // Send command + hidden PWD check to keep path updated (off EDT)
             final String finalCmd = cmd;
+            lastCommand = cmd;
             ioExecutor.submit(() -> {
-                shellOut.print(finalCmd + "; echo " + PWD_MARKER_START + "; pwd; echo " + PWD_MARKER_END + "\n");
+                String fullCmd;
+                if (shellType == ShellType.WINDOWS_CMD) {
+                    fullCmd = finalCmd + " & echo " + PWD_MARKER_START + " & cd & echo " + PWD_MARKER_END + "\n";
+                } else if (shellType == ShellType.WINDOWS_PS) {
+                    fullCmd = finalCmd + "; echo " + PWD_MARKER_START + "; (pwd).Path; echo " + PWD_MARKER_END + "\n";
+                } else {
+                    fullCmd = finalCmd + "; echo " + PWD_MARKER_START + "; pwd; echo " + PWD_MARKER_END + "\n";
+                }
+                shellOut.print(fullCmd);
                 shellOut.flush();
             });
             inputField.setText("");
@@ -1696,7 +1832,7 @@ public class ReverseShellReceiverPanel extends JPanel {
         IRequestInfo info = helpers.analyzeRequest(requestResponse);
         String method = info.getMethod();
         String url = info.getUrl().toString();
-        addRequestToHistory(method, url, requestBytes, responseBytes);
+        addRequestToHistory(method, url, requestBytes, responseBytes, requestResponse.getHttpService());
     }
 
     public void saveSettings(boolean showMessage) {
@@ -1726,14 +1862,14 @@ public class ReverseShellReceiverPanel extends JPanel {
             IRequestInfo info = helpers.analyzeRequest(selectedMessages[0]);
             String method = info.getMethod();
             String url = info.getUrl().toString();
-            addRequestToHistory(method, url, requestBytes, responseBytes);
+            addRequestToHistory(method, url, requestBytes, responseBytes, selectedMessages[0].getHttpService());
         }
     }
 
-    private void addRequestToHistory(String method, String url, byte[] requestBytes, byte[] responseBytes) {
+    private void addRequestToHistory(String method, String url, byte[] requestBytes, byte[] responseBytes, IHttpService httpService) {
         SwingUtilities.invokeLater(() -> {
             String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-            RequestEntry entry = new RequestEntry(requestHistory.size() + 1, method, url, timestamp, requestBytes, responseBytes);
+            RequestEntry entry = new RequestEntry(requestHistory.size() + 1, method, url, timestamp, requestBytes, responseBytes, httpService);
             requestHistory.add(entry);
             tableModel.addRow(new Object[] { entry.index, entry.method, entry.url, entry.timestamp });
 
@@ -1753,6 +1889,11 @@ public class ReverseShellReceiverPanel extends JPanel {
     private final IMessageEditorController requestController = new IMessageEditorController() {
         @Override
         public IHttpService getHttpService() {
+            int selectedRow = historyTable.getSelectedRow();
+            if (selectedRow != -1) {
+                int modelRow = historyTable.convertRowIndexToModel(selectedRow);
+                return requestHistory.get(modelRow).httpService;
+            }
             return null;
         }
 
@@ -1777,6 +1918,33 @@ public class ReverseShellReceiverPanel extends JPanel {
         }
     };
 
+    private static class HttpServiceImpl implements IHttpService {
+        private final String host;
+        private final int port;
+        private final String protocol;
+
+        public HttpServiceImpl(String host, int port, String protocol) {
+            this.host = host;
+            this.port = port;
+            this.protocol = protocol;
+        }
+
+        @Override
+        public String getHost() {
+            return host;
+        }
+
+        @Override
+        public int getPort() {
+            return port;
+        }
+
+        @Override
+        public String getProtocol() {
+            return protocol;
+        }
+    }
+
     private static class RequestEntry {
         int index;
         String method;
@@ -1784,14 +1952,16 @@ public class ReverseShellReceiverPanel extends JPanel {
         String timestamp;
         byte[] fullRequest;
         byte[] fullResponse;
+        IHttpService httpService;
 
-        RequestEntry(int index, String method, String url, String timestamp, byte[] fullRequest, byte[] fullResponse) {
+        RequestEntry(int index, String method, String url, String timestamp, byte[] fullRequest, byte[] fullResponse, IHttpService httpService) {
             this.index = index;
             this.method = method;
             this.url = url;
             this.timestamp = timestamp;
             this.fullRequest = fullRequest;
             this.fullResponse = fullResponse;
+            this.httpService = httpService;
         }
     }
 
